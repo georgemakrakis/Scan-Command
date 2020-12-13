@@ -20,10 +20,14 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -32,8 +36,9 @@ import java.util.UUID;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
-    // TODO: Change this to the HC-05 address
-    private static final String MAC = "C6:27:33:A3:A5:2D";
+    // The HC-05 address
+    private static final String MAC = "98:D3:11:FC:69:25";
+    private static boolean unlocked = false;
 
     public static BluetoothSocket mmSocket;
     public BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -50,16 +55,22 @@ public class MainActivity extends AppCompatActivity {
     public static Handler connectionHandler;
     public static boolean deviceFound;
     public static boolean connected;
-    //public static ConnectedThread connectedThread;
+    public static ConnectedThread connectedThread;
     public static CreateConnectThread createConnectThread;
     private final static int CONNECTING_STATUS = 1;
+    private final static int MESSAGE_READ = 2;
+
+    Button button;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        TextView t = (TextView)findViewById(R.id.text);
+        TextView t = findViewById(R.id.text);
+
+        button  = findViewById(R.id.unlockButton);
+        button.setClickable(false);
 
         if (bluetoothAdapter == null) {
             t.setText("Device doesn't support Bluetooth\n");
@@ -102,12 +113,13 @@ public class MainActivity extends AppCompatActivity {
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
+            short rssi = 0;
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 // Discovery has found a device. Get the BluetoothDevice
                 // object and its info from the Intent.
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
-                short rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI,Short.MIN_VALUE);
+                rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI,Short.MIN_VALUE);
                 TextView t = findViewById(R.id.text);
 
                 StringBuilder sb = new StringBuilder(7);
@@ -178,17 +190,41 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    public void onClickBtn(View v)
+    {
+        if(connected && !unlocked) {
+            connectedThread.write("UNLOCK!");
+            unlocked = true;
+            button.setText("UNLOCKED");
+            return;
+        }
+        if(connected && unlocked) {
+            connectedThread.write("LOCK!");
+            unlocked = false;
+            button.setText("LOCKED");
+            return;
+        }
+    }
+
     @Override
     protected void onResume() {
         locationHandler.postDelayed(runnable = new Runnable() {
             public void run() {
                 locationHandler.postDelayed(runnable, delay);
                 if(locationEnabled()) {
-                    bluetoothAdapter.startDiscovery();
+
+                    //bluetoothAdapter.startDiscovery();
 
                     if(deviceFound && !connected){
                         createConnectThread = new CreateConnectThread(bluetoothAdapter, MAC);
                         createConnectThread.start();
+                    }
+
+                    if(connected){
+                        button.setClickable(true);
+                    }
+                    else{
+                        button.setClickable(false);
                     }
                 }
             }
@@ -212,7 +248,6 @@ public class MainActivity extends AppCompatActivity {
              */
             BluetoothDevice bluetoothDevice = bluetoothAdapter.getRemoteDevice(address);
             BluetoothSocket tmp = null;
-            // TODO: use a static UUID
             UUID uuid = bluetoothDevice.getUuids()[0].getUuid();
 
             try {
@@ -233,20 +268,20 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             // Cancel discovery because it otherwise slows down the connection.
             BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-            bluetoothAdapter.cancelDiscovery();
+            //bluetoothAdapter.cancelDiscovery();
             try {
                 // Connect to the remote device through the socket. This call blocks
                 // until it succeeds or throws an exception.
                 mmSocket.connect();
                 Log.i("Status", "Device connected");
-                connectionHandler.obtainMessage(CONNECTING_STATUS, 1, -1).sendToTarget();
+                //connectionHandler.obtainMessage(CONNECTING_STATUS, 1, -1).sendToTarget();
                 connected = true;
             } catch (IOException connectException) {
                 // Unable to connect; close the socket and return.
                 try {
                     mmSocket.close();
                     Log.i("Status", "Cannot connect to device");
-                    connectionHandler.obtainMessage(CONNECTING_STATUS, -1, -1).sendToTarget();
+                    //connectionHandler.obtainMessage(CONNECTING_STATUS, -1, -1).sendToTarget();
                     connected = false;
                 } catch (IOException closeException) {
                     Log.e(TAG, "Could not close the client socket", closeException);
@@ -256,8 +291,8 @@ public class MainActivity extends AppCompatActivity {
 
             // The connection attempt succeeded. Perform work associated with
             // the connection in a separate thread.
-            //connectedThread = new ConnectedThread(mmSocket);
-            //connectedThread.run();
+            connectedThread = new ConnectedThread(mmSocket);
+            connectedThread.run();
         }
 
         // Closes the client socket and causes the thread to finish.
@@ -268,6 +303,72 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 Log.e(TAG, "Could not close the client socket", e);
             }
+        }
+    }
+
+    public static class ConnectedThread extends Thread {
+        private final BluetoothSocket mmSocket;
+        private final InputStream mmInStream;
+        private final OutputStream mmOutStream;
+
+        public ConnectedThread(BluetoothSocket socket) {
+            mmSocket = socket;
+            InputStream tmpIn = null;
+            OutputStream tmpOut = null;
+
+            // Get the input and output streams, using temp objects because
+            // member streams are final
+            try {
+                tmpIn = socket.getInputStream();
+                tmpOut = socket.getOutputStream();
+            } catch (IOException e) { }
+
+            mmInStream = tmpIn;
+            mmOutStream = tmpOut;
+        }
+
+        public void run() {
+            byte[] buffer = new byte[1024];  // buffer store for the stream
+            int bytes = 0; // bytes returned from read()
+            // Keep listening to the InputStream until an exception occurs
+            while (true) {
+                try {
+                    /*
+                    Read from the InputStream from Arduino until termination character is reached.
+                    Then send the whole String message to GUI Handler.
+                     */
+                    buffer[bytes] = (byte) mmInStream.read();
+                    String readMessage;
+                    if (buffer[bytes] == '\n'){
+                        readMessage = new String(buffer,0,bytes);
+                        Log.e("Arduino Message",readMessage);
+                        //connectionHandler.obtainMessage(MESSAGE_READ,readMessage).sendToTarget();
+                        bytes = 0;
+                    } else {
+                        bytes++;
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    break;
+                }
+            }
+        }
+
+        /* Call this from the main activity to send data to the remote device */
+        public void write(String input) {
+            byte[] bytes = input.getBytes(); //converts entered String into bytes
+            try {
+                mmOutStream.write(bytes);
+            } catch (IOException e) {
+                Log.e("Send Error","Unable to send message",e);
+            }
+        }
+
+        /* Call this from the main activity to shutdown the connection */
+        public void cancel() {
+            try {
+                mmSocket.close();
+            } catch (IOException e) { }
         }
     }
 
