@@ -35,9 +35,10 @@ public class MainActivity extends AppCompatActivity {
     private final static int REQUEST_ID = 1;
     Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
 
+    // This will be used to scan if location services are enabled
     Handler handler = new Handler();
     Runnable runnable;
-    int delay = 2000;
+    int delay = 5000;
 
 
     @Override
