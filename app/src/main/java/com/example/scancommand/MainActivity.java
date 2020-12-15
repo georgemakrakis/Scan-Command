@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
 
         button  = findViewById(R.id.unlockButton);
         button.setClickable(false);
+        button.setEnabled(false);
 
         if (bluetoothAdapter == null) {
             t.setText("Device doesn't support Bluetooth\n");
@@ -213,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
                 locationHandler.postDelayed(runnable, delay);
                 if(locationEnabled()) {
 
-                    //bluetoothAdapter.startDiscovery();
+                    bluetoothAdapter.startDiscovery();
 
                     if(deviceFound && !connected){
                         createConnectThread = new CreateConnectThread(bluetoothAdapter, MAC);
@@ -222,9 +223,11 @@ public class MainActivity extends AppCompatActivity {
 
                     if(connected){
                         button.setClickable(true);
+                        button.setEnabled(true);
                     }
                     else{
                         button.setClickable(false);
+                        button.setEnabled(false);
                     }
                 }
             }
@@ -268,7 +271,7 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             // Cancel discovery because it otherwise slows down the connection.
             BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-            //bluetoothAdapter.cancelDiscovery();
+            bluetoothAdapter.cancelDiscovery();
             try {
                 // Connect to the remote device through the socket. This call blocks
                 // until it succeeds or throws an exception.
