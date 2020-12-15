@@ -67,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        TextView t = findViewById(R.id.text);
+        TextView t = findViewById(R.id.info);
 
         button  = findViewById(R.id.unlockButton);
         button.setClickable(false);
@@ -121,11 +121,11 @@ public class MainActivity extends AppCompatActivity {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
                 rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI,Short.MIN_VALUE);
-                TextView t = findViewById(R.id.text);
+                TextView t = findViewById(R.id.info);
 
                 StringBuilder sb = new StringBuilder(7);
-                sb.append("Name: ").append(device.getName()).append("Address: ").
-                        append(device.getAddress()).append("RSSI:" ).append(rssi).append("dbm");
+                sb.append("Name: ").append(device.getName()).append("\nAddress: ").
+                        append(device.getAddress()).append("\nRSSI:" ).append(rssi).append("dbm");
 
                 t.setText(sb.toString());
 
@@ -197,12 +197,18 @@ public class MainActivity extends AppCompatActivity {
             connectedThread.write("UNLOCK!");
             unlocked = true;
             button.setText("UNLOCKED");
+            TextView t = findViewById(R.id.message);
+            t.setText(new StringBuilder(2).append("Message: ")
+                    .append(connectedThread.message));
             return;
         }
         if(connected && unlocked) {
             connectedThread.write("LOCK!");
             unlocked = false;
             button.setText("LOCKED");
+            TextView t = findViewById(R.id.message);
+            t.setText(new StringBuilder(2).append("Message: ")
+                    .append(connectedThread.message));
             return;
         }
     }
@@ -313,6 +319,7 @@ public class MainActivity extends AppCompatActivity {
         private final BluetoothSocket mmSocket;
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
+        public String message;
 
         public ConnectedThread(BluetoothSocket socket) {
             mmSocket = socket;
@@ -345,6 +352,7 @@ public class MainActivity extends AppCompatActivity {
                     if (buffer[bytes] == '\n'){
                         readMessage = new String(buffer,0,bytes);
                         Log.e("Arduino Message",readMessage);
+                        message = readMessage;
                         //connectionHandler.obtainMessage(MESSAGE_READ,readMessage).sendToTarget();
                         bytes = 0;
                     } else {
