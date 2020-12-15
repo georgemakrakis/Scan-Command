@@ -13,6 +13,8 @@ import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -107,8 +109,43 @@ public class MainActivity extends AppCompatActivity {
         Log.i(TAG, "DISCOVER");
 
 
+        connectionHandler = new Handler(Looper.getMainLooper()) {
+            @Override
+            public void handleMessage(Message msg) {
+                switch (msg.what) {
+//                    case CONNECTING_STATUS:
+//                        switch (msg.arg1) {
+//                            case 1:
+//                                toolbar.setSubtitle("Connected to " + deviceName);
+//                                progressBar.setVisibility(View.GONE);
+//                                buttonConnect.setEnabled(true);
+//                                buttonToggle.setEnabled(true);
+//                                break;
+//                            case -1:
+//                                toolbar.setSubtitle("Device fails to connect");
+//                                progressBar.setVisibility(View.GONE);
+//                                buttonConnect.setEnabled(true);
+//                                break;
+//                        }
+//                        break;
+                    case MESSAGE_READ:
+                        String arduinoMsg = msg.obj.toString(); // Read message from Arduino
+                        TextView message = findViewById(R.id.message);
+                        switch (arduinoMsg.toLowerCase()) {
+                            case "0":
+                                message.setText("Arduino Message : " + arduinoMsg);
+                                break;
+                            case "1":
+                                message.setText("Arduino Message : " + arduinoMsg);
+                                break;
+                        }
+                        break;
+                }
+            }
+        };
 
-    }
+
+        }
 
     // Create a BroadcastReceiver for ACTION_FOUND.
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
@@ -198,8 +235,8 @@ public class MainActivity extends AppCompatActivity {
             unlocked = true;
             button.setText("UNLOCKED");
             TextView t = findViewById(R.id.message);
-            t.setText(new StringBuilder(2).append("Message: ")
-                    .append(connectedThread.message));
+//            t.setText(new StringBuilder(2).append("Message: ")
+//                    .append(connectedThread.message));
             return;
         }
         if(connected && unlocked) {
@@ -207,14 +244,15 @@ public class MainActivity extends AppCompatActivity {
             unlocked = false;
             button.setText("LOCKED");
             TextView t = findViewById(R.id.message);
-            t.setText(new StringBuilder(2).append("Message: ")
-                    .append(connectedThread.message));
+//            t.setText(new StringBuilder(2).append("Message: ")
+//                    .append(connectedThread.message));
             return;
         }
     }
 
     @Override
     protected void onResume() {
+        // Check is the location is enabled in order to discover, connect and send data
         locationHandler.postDelayed(runnable = new Runnable() {
             public void run() {
                 locationHandler.postDelayed(runnable, delay);
@@ -319,7 +357,6 @@ public class MainActivity extends AppCompatActivity {
         private final BluetoothSocket mmSocket;
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
-        public String message;
 
         public ConnectedThread(BluetoothSocket socket) {
             mmSocket = socket;
@@ -352,8 +389,7 @@ public class MainActivity extends AppCompatActivity {
                     if (buffer[bytes] == '\n'){
                         readMessage = new String(buffer,0,bytes);
                         Log.e("Arduino Message",readMessage);
-                        message = readMessage;
-                        //connectionHandler.obtainMessage(MESSAGE_READ,readMessage).sendToTarget();
+                        connectionHandler.obtainMessage(MESSAGE_READ,readMessage).sendToTarget();
                         bytes = 0;
                     } else {
                         bytes++;
