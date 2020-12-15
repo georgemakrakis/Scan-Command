@@ -133,10 +133,14 @@ public class MainActivity extends AppCompatActivity {
                         TextView message = findViewById(R.id.message);
                         switch (arduinoMsg.toLowerCase()) {
                             case "0":
-                                message.setText("Arduino Message : " + arduinoMsg);
+                                if(arduinoMsg.equals("0")) {
+                                    button.setText("UNLOCKED");
+                                }
                                 break;
                             case "1":
-                                message.setText("Arduino Message : " + arduinoMsg);
+                                if(arduinoMsg.equals("1")) {
+                                    button.setText("LOCKED");
+                                }
                                 break;
                         }
                         break;
@@ -233,19 +237,11 @@ public class MainActivity extends AppCompatActivity {
         if(connected && !unlocked) {
             connectedThread.write("UNLOCK!");
             unlocked = true;
-            button.setText("UNLOCKED");
-            TextView t = findViewById(R.id.message);
-//            t.setText(new StringBuilder(2).append("Message: ")
-//                    .append(connectedThread.message));
             return;
         }
         if(connected && unlocked) {
             connectedThread.write("LOCK!");
             unlocked = false;
-            button.setText("LOCKED");
-            TextView t = findViewById(R.id.message);
-//            t.setText(new StringBuilder(2).append("Message: ")
-//                    .append(connectedThread.message));
             return;
         }
     }
